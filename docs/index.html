@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>刘晓艳行动</title>
+<link id="-gd-engine-icon" rel="icon" type="image/png" href="index.icon.png" />
+<link rel="apple-touch-icon" href="index.apple-touch-icon.png"/>
+
+<style>
+:root{color-scheme:dark;font-family:system-ui,"Microsoft YaHei",sans-serif;background:#0d1512;color:#edf7ef}*{box-sizing:border-box}body{margin:0;overflow:hidden}main{position:fixed;inset:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);display:flex;flex-direction:column}header{display:flex;align-items:center;gap:12px;padding:3px 12px;color:#bdd6c5;font-size:13px}header span{flex:1}button{cursor:pointer;font:inherit;color:inherit;border:1px solid #4c6455;background:#17251e;padding:.35em .8em}section{position:relative;flex:1}canvas{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);outline:0;touch-action:none}aside{position:fixed;inset:0;background:radial-gradient(ellipse at center,#213d2c,#090e0d 72%);display:grid;place-content:center;text-align:center;padding:16px}aside img{width:min(280px,62vw);height:60px;object-fit:cover;object-position:50% 49.5%;margin:auto}progress{width:min(360px,75vw);accent-color:#82ffaa}aside button{color:#102218;background:#93f9ad;padding:.65em 2em;font-weight:700}aside button:disabled{opacity:.45}#status{min-height:1.5em}#rotate{display:none}@media(orientation:portrait) and (pointer:coarse){#rotate{display:inline}}[hidden]{display:none!important}
+</style></head><body>
+<main><header><span>本机存档 <b id="rotate">· 请横置手机</b></span><button id="backup">导出进度</button><button id="full">全屏</button></header>
+<section id="stage"><canvas id="canvas" width="1280" height="720" tabindex="0" aria-label="游戏画面"></canvas></section></main>
+<aside id="loading"><img src="wordmark.png" alt="刘晓艳行动"><p>四级 · 六级 · 考研 · 高中3500</p><progress id="progress" max="1"></progress><p id="status" role="status">正在整备游戏资源</p><button disabled id="start">开始行动</button></aside>
+<script src="learning.js"></script><script src="index.js"></script><script>
+const cfg={"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":true,"fileSizes":{"index.pck":48579196,"index.wasm":38034280},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const $=selector=>document.querySelector(selector);
+/* 本地开关：?desktop=1 强制桌面界面；再加 ?novk=1 关掉网页虚拟键盘（四选一用） */
+const QS=new URLSearchParams(location.search);
+const DESKTOP_MODE=QS.has('desktop')||QS.has('novk');
+if(QS.has('novk'))cfg.experimentalVK=false;
+if(DESKTOP_MODE){
+  const nativeMatchMedia=window.matchMedia.bind(window);
+  window.matchMedia=q=>/pointer:\s*coarse/.test(String(q))?{matches:false,media:String(q),onchange:null,addListener(){},removeListener(){},addEventListener(){},removeEventListener(){},dispatchEvent(){return false}}:nativeMatchMedia(q);
+  WordGame.isMobileLayout=()=>false;
+  /* 手机弹软键盘时，画布/窗口会失焦，Godot 转成 focus_exited，工程里 _focus_lost()
+     立刻请求暂停 —— 于是「继续 → 弹键盘 → 失焦 → 又暂停」。这里在捕获阶段拦掉
+     窗口和画布的 blur，别让它传进引擎；输入框自己的 blur 放行，键盘才能正常收起。 */
+  const swallow=e=>{const t=e.target;if(t===window||(t&&t.id==='canvas'))e.stopImmediatePropagation()};
+  window.addEventListener('blur',swallow,true);
+}
+cfg.canvasResizePolicy=0;
+cfg.onProgress=(n,total)=>{if(total)$('#progress').value=n/total};
+const engine=new Engine(cfg),canvas=$('#canvas'),start=$('#start');
+function resize(){
+  const {width,height}=$('#stage').getBoundingClientRect();
+  window.WordToyMobile=WordGame.isMobileLayout(width,height,matchMedia('(pointer:coarse)').matches);
+  const m=WordGame.stageMetrics(width,height,devicePixelRatio,window.WordToyMobile);
+  canvas.style.width=m.width+'px';canvas.style.height=m.height+'px';
+  if(canvas.width!==m.pixelWidth)canvas.width=m.pixelWidth;
+  if(canvas.height!==m.pixelHeight)canvas.height=m.pixelHeight;
+}
+function fail(err){$('#status').textContent=err.message||String(err);start.disabled=false;start.textContent='重新加载';start.onclick=()=>location.reload()}
+new ResizeObserver(resize).observe($('#stage'));resize();
+$('#backup').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([WordGame.backup()],{type:'application/json'}));a.download='刘晓艳行动_学习存档.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
+$('#full').onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else{await document.documentElement.requestFullscreen();if(window.WordToyMobile)await screen.orientation?.lock?.('landscape')}}catch{}};
+(async()=>{
+  const missing=Engine.getMissingFeatures({threads:false});
+  if(missing.length)throw Error('浏览器缺少 '+missing.join('、'));
+  await Promise.all([WordGame.ready,engine.init(cfg.executable),engine.preloadFile(cfg.executable+'.pck',cfg.executable+'.pck')]);
+  $('#progress').value=1;$('#status').textContent='整备完成';start.disabled=false;
+  start.onclick=async()=>{try{start.disabled=true;await engine.start({canvas,args:['--main-pack',cfg.executable+'.pck']});$('#loading').hidden=true;canvas.focus()}catch(err){fail(err)}};
+})().catch(fail);
+</script></body></html>
+
