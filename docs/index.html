@@ -27,6 +27,37 @@ if(DESKTOP_MODE){
      窗口和画布的 blur，别让它传进引擎；输入框自己的 blur 放行，键盘才能正常收起。 */
   const swallow=e=>{const t=e.target;if(t===window||(t&&t.id==='canvas'))e.stopImmediatePropagation()};
   window.addEventListener('blur',swallow,true);
+
+  /* 四选一题目不需要键盘。游戏的每帧 tick 都会带回完整状态，看里面有没有 choice 对象，
+     有就不让 Godot 的输入框抢焦点，键盘就不会弹；拼写题没有 choice，照常弹键盘。 */
+  let choiceActive=false;
+  const nativeCommand=WordGame.command.bind(WordGame);
+  WordGame.command=function(json){
+    const out=nativeCommand(json);
+    try{
+      if(String(json).indexOf('"action":"tick"')<0){
+        const st=JSON.parse(out);
+        choiceActive=!!(st&&st.choice&&typeof st.choice==='object');
+      }else if(out.indexOf('"choice":{')>=0){
+        choiceActive=true;
+      }else if(out.indexOf('"choice":null')>=0){
+        choiceActive=false;
+      }
+    }catch(e){}
+    return out;
+  };
+  const nativeFocus=HTMLElement.prototype.focus;
+  HTMLElement.prototype.focus=function(...a){
+    if(choiceActive&&(this.tagName==='INPUT'||this.tagName==='TEXTAREA')){
+      this.style.display='none';
+      return;
+    }
+    return nativeFocus.apply(this,a);
+  };
+  document.addEventListener('focusin',e=>{
+    const t=e.target;
+    if(choiceActive&&t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA')){t.style.display='none';t.blur()}
+  },true);
 }
 cfg.canvasResizePolicy=0;
 cfg.onProgress=(n,total)=>{if(total)$('#progress').value=n/total};
