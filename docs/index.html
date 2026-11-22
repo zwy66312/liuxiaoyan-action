@@ -22,6 +22,7 @@ if(DESKTOP_MODE){
   const nativeMatchMedia=window.matchMedia.bind(window);
   window.matchMedia=q=>/pointer:\s*coarse/.test(String(q))?{matches:false,media:String(q),onchange:null,addListener(){},removeListener(){},addEventListener(){},removeEventListener(){},dispatchEvent(){return false}}:nativeMatchMedia(q);
   WordGame.isMobileLayout=()=>false;
+  window.WordToyForceDesktop=true;
   /* 手机弹软键盘时，画布/窗口会失焦，Godot 转成 focus_exited，工程里 _focus_lost()
      立刻请求暂停 —— 于是「继续 → 弹键盘 → 失焦 → 又暂停」。这里在捕获阶段拦掉
      窗口和画布的 blur，别让它传进引擎；输入框自己的 blur 放行，键盘才能正常收起。 */
